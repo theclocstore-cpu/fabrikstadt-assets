@@ -1,0 +1,47 @@
+name: Auto-Posting Instagram + Pinterest
+
+on:
+  schedule:
+    # Zeiten in UTC. Sommerzeit (MESZ, UTC+2): 07:00 -> 9:00, 19:00 -> 21:00.
+    # Ab Ende Oktober (MEZ, UTC+1) auf 08:00 und 20:00 aendern.
+    - cron: "0 7 * * *"
+    - cron: "0 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: posting
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Beitrag veroeffentlichen
+        env:
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          PINTEREST_BOARD_ID: ${{ secrets.PINTEREST_BOARD_ID }}
+          PUBLIC_IMAGE_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/main
+          PIN_LINK: https://wa.me/8618566581431
+        run: python3 ig_post.py --once
+
+      - name: Warteschlange zurueckschreiben
+        run: |
+          if ! git diff --quiet queue.json; then
+            git config user.name  "fabrikstadt-bot"
+            git config user.email "actions@github.com"
+            git add queue.json
+            git commit -m "Beitrag veroeffentlicht [skip ci]"
+            git push
+          else
+            echo "Nichts geaendert - kein Commit noetig."
+          fi
